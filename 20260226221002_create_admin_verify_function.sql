@@ -1,21 +1,25 @@
-import { Facebook, Youtube } from 'lucide-react';
+/*
+  # Create increment_visitor RPC function
 
-export default function Header() {
-  return (
-    <header className="bg-white border-b border-gray-200">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-end gap-4 py-2 flex-wrap">
-          <a href="https://www.facebook.com/eyeclinicMaGo" target="_blank" rel="noopener noreferrer" className="hover:opacity-80">
-            <Facebook className="w-6 h-6 text-blue-600" />
-          </a>
-          <a href="https://www.youtube.com/channel/UCfWbr2cXHIoHqQPgGphWR0Q" target="_blank" rel="noopener noreferrer" className="hover:opacity-80">
-            <Youtube className="w-6 h-6 text-red-600" />
-          </a>
-          <div className="font-bold text-sm">
-            Viber / WhatsApp: <a href="tel:+995599506507" className="hover:text-blue-600">(+995) 599 506 507</a>
-          </div>
-        </div>
-      </div>
-    </header>
-  );
-}
+  ## Summary
+  Creates a PostgreSQL function callable via Supabase RPC that atomically
+  increments the daily visitor count for a given date.
+  Uses INSERT ... ON CONFLICT to safely upsert the row without race conditions.
+
+  ## Function
+  - `increment_visitor(p_date date)` - inserts a new row for the date with count 1,
+    or increments the existing count by 1 if the row already exists.
+*/
+
+CREATE OR REPLACE FUNCTION increment_visitor(p_date date)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  INSERT INTO visitor_stats (visit_date, daily_count)
+  VALUES (p_date, 1)
+  ON CONFLICT (visit_date)
+  DO UPDATE SET daily_count = visitor_stats.daily_count + 1;
+END;
+$$;

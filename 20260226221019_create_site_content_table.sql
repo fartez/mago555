@@ -1,50 +1,45 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+/*
+  # Create bookings table
 
-const BASELINE = 48142;
-const SESSION_KEY = 'visitor_counted';
+  ## Summary
+  Creates a table to store all appointment booking form submissions from the website.
 
-interface VisitorData {
-  total: number;
-  todayCount: number;
-  loading: boolean;
-}
+  ## New Tables
+  - `bookings`
+    - `id` (uuid, primary key) - unique identifier for each booking
+    - `preferred_date` (date) - patient's preferred appointment date
+    - `full_name` (text) - patient or contact person's full name
+    - `email` (text) - contact email address
+    - `phone` (text) - contact phone number
+    - `age` (integer) - patient's age
+    - `relationship` (text) - relationship to patient (patient, family, friend)
+    - `medical_history` (text) - optional medical history notes
+    - `created_at` (timestamptz) - timestamp when booking was submitted
+    - `notified` (boolean) - whether email notification was sent successfully
 
-export function useVisitorCount(): VisitorData {
-  const [todayCount, setTodayCount] = useState(0);
-  const [allTimeSum, setAllTimeSum] = useState(0);
-  const [loading, setLoading] = useState(true);
+  ## Security
+  - RLS enabled
+  - Anonymous users can INSERT (to allow form submissions without login)
+  - No SELECT policy for anonymous - data is private
+*/
 
-  useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
-    const alreadyCounted = sessionStorage.getItem(SESSION_KEY) === today;
+CREATE TABLE IF NOT EXISTS bookings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  preferred_date date,
+  full_name text NOT NULL DEFAULT '',
+  email text NOT NULL DEFAULT '',
+  phone text NOT NULL DEFAULT '',
+  age integer,
+  relationship text DEFAULT '',
+  medical_history text DEFAULT '',
+  created_at timestamptz DEFAULT now(),
+  notified boolean DEFAULT false
+);
 
-    async function recordAndFetch() {
-      if (!alreadyCounted) {
-        await supabase.rpc('increment_visitor', { p_date: today });
-        sessionStorage.setItem(SESSION_KEY, today);
-      }
+ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 
-      const { data } = await supabase
-        .from('visitor_stats')
-        .select('visit_date, daily_count');
-
-      if (data) {
-        const sum = data.reduce((acc, row) => acc + row.daily_count, 0);
-        const todayRow = data.find((row) => row.visit_date === today);
-        setAllTimeSum(sum);
-        setTodayCount(todayRow?.daily_count ?? 0);
-      }
-
-      setLoading(false);
-    }
-
-    recordAndFetch();
-  }, []);
-
-  return {
-    total: BASELINE + allTimeSum,
-    todayCount,
-    loading,
-  };
-}
+CREATE POLICY "Anyone can submit a booking"
+  ON bookings
+  FOR INSERT
+  TO anon
+  WITH CHECK (true);
